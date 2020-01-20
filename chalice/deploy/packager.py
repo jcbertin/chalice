@@ -98,16 +98,17 @@ class LambdaDeploymentPackager(object):
                 self._osutils.abspath(package_filename))
             if not self._osutils.directory_exists(dirname):
                 self._osutils.makedirs(dirname)
+            prefix = 'python/'
             with self._osutils.open_zip(package_filename, 'w',
                                         self._osutils.ZIP_DEFLATED) as z:
-                self._add_py_deps(z, site_packages_dir)
+                self._add_py_deps(z, site_packages_dir, prefix)
                 self._add_vendor_files(z, self._osutils.joinpath(
-                    project_dir, self._VENDOR_DIR))
+                    project_dir, self._VENDOR_DIR), prefix)
         return package_filename
 
     def create_deployment_package(self, project_dir, python_version,
-                                  package_filename=None):
-        # type: (str, str, Optional[str]) -> str
+                                  automatic_layer):
+        # type: (str, str, bool) -> str
         msg = "Creating deployment package."
         self._ui.write("%s\n" % msg)
         logger.debug(msg)
@@ -119,12 +120,31 @@ class LambdaDeploymentPackager(object):
             self._osutils.abspath(package_filename))
         if not self._osutils.directory_exists(dirname):
             self._osutils.makedirs(dirname)
-        with self._osutils.open_zip(package_filename, 'w',
-                                    self._osutils.ZIP_DEFLATED) as z:
-            self._add_app_files(z, project_dir)
+        if automatic_layer:
+            with self._osutils.open_zip(package_filename, 'w',
+                                        self._osutils.ZIP_DEFLATED) as z:
+                self._add_app_files(z, project_dir)
+        else:
+            requirements_filepath = self._get_requirements_filename(project_dir)
+            with self._osutils.tempdir() as site_packages_dir:
+                try:
+                    abi = self._RUNTIME_TO_ABI[python_version]
+                    self._dependency_builder.build_site_packages(
+                        abi, requirements_filepath, site_packages_dir)
+                except MissingDependencyError as e:
+                    missing_packages = '\n'.join([p.identifier for p
+                                                  in e.missing])
+                    self._ui.write(
+                        MISSING_DEPENDENCIES_TEMPLATE % missing_packages)
+                with self._osutils.open_zip(package_filename, 'w',
+                                            self._osutils.ZIP_DEFLATED) as z:
+                    self._add_py_deps(z, site_packages_dir)
+                    self._add_app_files(z, project_dir)
+                    self._add_vendor_files(z, self._osutils.joinpath(
+                        project_dir, self._VENDOR_DIR))
         return package_filename
 
-    def _add_vendor_files(self, zipped, dirname):
+    def _add_vendor_files(self, zipped, dirname, prefix=''):
         # type: (ZipFile, str) -> None
         if not self._osutils.directory_exists(dirname):
             return
@@ -132,7 +152,7 @@ class LambdaDeploymentPackager(object):
         for root, _, filenames in self._osutils.walk(dirname):
             for filename in filenames:
                 full_path = self._osutils.joinpath(root, filename)
-                zip_path = 'python/%s' % full_path[prefix_len:]
+                zip_path = prefix + full_path[prefix_len:]
                 zipped.write(full_path, zip_path)
 
     def deployment_package_filename(
@@ -155,7 +175,7 @@ class LambdaDeploymentPackager(object):
             project_dir, '.chalice', 'deployments', filename)
         return deployment_package_filename
 
-    def _add_py_deps(self, zip_fileobj, deps_dir):
+    def _add_py_deps(self, zip_fileobj, deps_dir, prefix=''):
         # type: (ZipFile, str) -> None
         prefix_len = len(deps_dir) + 1
         for root, dirnames, filenames in self._osutils.walk(deps_dir):
@@ -165,7 +185,7 @@ class LambdaDeploymentPackager(object):
                 dirnames.remove('chalice')
             for filename in filenames:
                 full_path = self._osutils.joinpath(root, filename)
-                zip_path = 'python/%s' % full_path[prefix_len:]
+                zip_path = prefix + full_path[prefix_len:]
                 zip_fileobj.write(full_path, zip_path)
 
     def _add_app_files(self, zip_fileobj, project_dir):

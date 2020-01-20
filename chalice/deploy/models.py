@@ -173,6 +173,7 @@ class LambdaFunction(ManagedModel):
     subnet_ids = attrib()             # type: List[str]
     reserved_concurrency = attrib()   # type: int
     layers = attrib()                 # type: List[str]
+    automatic_layer = attrib()        # type: bool
 
     def dependencies(self):
         # type: () -> List[Model]

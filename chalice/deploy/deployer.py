@@ -687,7 +687,8 @@ class ApplicationGraphBuilder(object):
             security_group_ids=security_group_ids,
             subnet_ids=subnet_ids,
             reserved_concurrency=config.reserved_concurrency,
-            layers=lambda_layers
+            layers=lambda_layers,
+            automatic_layer=config.automatic_layer
         )
         self._inject_role_traits(function, role)
         return function
@@ -834,7 +835,9 @@ class DeploymentPackager(BaseDeployStep):
         # type: (Config, models.DeploymentPackage) -> None
         if isinstance(resource.filename, models.Placeholder):
             zip_filename = self._packager.create_deployment_package(
-                config.project_dir, config.lambda_python_version)
+                config.project_dir,
+                config.lambda_python_version,
+                config.automatic_layer)
             resource.filename = zip_filename
 
 

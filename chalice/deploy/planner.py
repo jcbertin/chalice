@@ -239,9 +239,12 @@ class PlanStage(object):
                 % resource.function_name
             )
 
-        layers = [Variable('layer_version_arn')]  # type: List[Any]
-        if resource.layers:
-            layers.extend(resource.layers)
+        if resource.automatic_layer:
+            layers = [Variable('layer_version_arn')]  # type: List[Any]
+            if resource.layers:
+                layers.extend(resource.layers)
+        else:
+            layers = resource.layers
 
         api_calls = []  # type: List[InstructionMsg]
         if not self._remote_state.resource_exists(resource):
