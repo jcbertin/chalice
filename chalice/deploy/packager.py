@@ -145,7 +145,7 @@ class LambdaDeploymentPackager(object):
         return package_filename
 
     def _add_vendor_files(self, zipped, dirname, prefix=''):
-        # type: (ZipFile, str) -> None
+        # type: (ZipFile, str, Optional[str]) -> None
         if not self._osutils.directory_exists(dirname):
             return
         prefix_len = len(dirname) + 1
@@ -176,7 +176,7 @@ class LambdaDeploymentPackager(object):
         return deployment_package_filename
 
     def _add_py_deps(self, zip_fileobj, deps_dir, prefix=''):
-        # type: (ZipFile, str) -> None
+        # type: (ZipFile, str, Optional[str]) -> None
         prefix_len = len(deps_dir) + 1
         for root, dirnames, filenames in self._osutils.walk(deps_dir):
             if root == deps_dir and 'chalice' in dirnames:
